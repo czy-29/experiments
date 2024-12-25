@@ -1,17 +1,16 @@
 [package]
-name = "template-rs"
+name = "experiments"
 authors = ["29 <791603901@qq.com>"]
 version = "0.0.1"
 license = "MIT/Apache-2.0"
-readme = "README.md"
-keywords = ["template"]
-categories = ["multimedia::audio"]
-repository = "https://github.com/opensound-org/template-rs"
-homepage = "https://github.com/opensound-org/template-rs"
+readme = "README.txt"
+repository = "https://github.com/czy-29/experiments"
+homepage = "https://github.com/czy-29/experiments"
 description = """
-🚧 Template for Rust repositories used by `opensound-org` (WIP, nothing usable for now).
+29's experiments
 """
 edition = "2021"
+publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
