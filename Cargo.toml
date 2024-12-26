@@ -23,6 +23,7 @@ rust-version = "1.80.0"
 all-features = true
 
 [dependencies]
+tokio = { version = "1.42.0", features = ["full"] }
 
 [dev-dependencies]
 
