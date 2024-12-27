@@ -1,5 +1,8 @@
 use std::thread;
-use tokio::{runtime, time::{sleep, Duration}};
+use tokio::{
+    runtime,
+    time::{sleep, Duration},
+};
 
 fn main() {
     let handle = thread::spawn(rt2);
