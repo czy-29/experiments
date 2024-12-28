@@ -44,7 +44,12 @@ fn main() {
     println!("total memory: {} GB", sys.total_memory().to_gb_rounded());
     println!("used memory: {} GB", sys.used_memory().to_gb_rounded());
 
-    for (i, (k, v)) in Networks::new_with_refreshed_list().iter().enumerate() {
+    let networks = Networks::new_with_refreshed_list();
+    println!("");
+    println!("Networks:");
+    println!("interface count: {}", networks.len());
+
+    for (i, (k, v)) in networks.iter().enumerate() {
         println!("");
         println!("Network interface {}:", i + 1);
         println!("name: {}", k);
