@@ -46,7 +46,7 @@ fn main() {
 
     let networks = Networks::new_with_refreshed_list();
     println!("");
-    println!("Networks:");
+    println!("Network:");
     println!("interface count: {}", networks.len());
 
     for (i, (k, v)) in networks.iter().enumerate() {
