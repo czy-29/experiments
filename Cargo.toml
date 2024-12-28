@@ -26,6 +26,7 @@ all-features = true
 rust_decimal = "1.36.0"
 sysinfo = "0.33.1"
 tokio = { version = "1.42.0", features = ["full"] }
+wgpu = "23.0.1"
 
 [dev-dependencies]
 
