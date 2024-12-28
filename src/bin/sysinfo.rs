@@ -1,5 +1,6 @@
 use rust_decimal::prelude::*;
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, Networks, RefreshKind, System};
+use wgpu::{Backends, Dx12Compiler, Instance, InstanceDescriptor, InstanceFlags};
 
 trait ToGbRounded {
     fn to_gb_rounded(self) -> Decimal;
@@ -59,5 +60,32 @@ fn main() {
         for (i, ip) in v.ip_networks().iter().enumerate() {
             println!("Ip Network {}: {}", i + 1, ip);
         }
+    }
+
+    let adapters = Instance::new(InstanceDescriptor {
+        backends: Backends::all(),
+        flags: InstanceFlags::from_build_config(),
+        dx12_shader_compiler: Dx12Compiler::Dxc {
+            dxil_path: None,
+            dxc_path: None,
+        },
+        gles_minor_version: Default::default(),
+    })
+    .enumerate_adapters(Backends::all());
+    println!("");
+    println!("Gpu:");
+    println!("wgpu adapter count: {}", adapters.len());
+
+    for (i, adapter) in adapters.iter().enumerate() {
+        let info = adapter.get_info();
+        println!("");
+        println!("Wgpu adapter {}:", i + 1);
+        println!("adapter name: {}", info.name);
+        println!("vendor id: {}", info.vendor);
+        println!("device id: {}", info.device);
+        println!("device type: {:?}", info.device_type);
+        println!("driver: {}", info.driver);
+        println!("driver info: {}", info.driver_info);
+        println!("backend: {}", info.backend);
     }
 }
