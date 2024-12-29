@@ -1,5 +1,5 @@
 {
-    "proc_id": 40732,
+    "proc_id": 45736,
     "proc_name": "proc_env_json.exe",
     "host_name": "DESKTOP-AO1H1A7",
     "system": {
@@ -19,7 +19,7 @@
     },
     "memory": {
       "total_memory": 34185707520,
-      "used_memory": 19885953024
+      "used_memory": 20613283840
     },
     "networks": {
       "VMware Network Adapter VMnet1": {
@@ -27,12 +27,12 @@
         "mtu": 1500,
         "ip_networks": [
           {
-            "addr": "fe80::de35:7c8d:7405:6bab",
-            "prefix": 64
-          },
-          {
             "addr": "192.168.107.1",
             "prefix": 24
+          },
+          {
+            "addr": "fe80::de35:7c8d:7405:6bab",
+            "prefix": 64
           }
         ]
       },
@@ -41,12 +41,12 @@
         "mtu": 1500,
         "ip_networks": [
           {
-            "addr": "fe80::605e:aa4b:2224:3ee7",
-            "prefix": 64
-          },
-          {
             "addr": "192.168.58.1",
             "prefix": 24
+          },
+          {
+            "addr": "fe80::605e:aa4b:2224:3ee7",
+            "prefix": 64
           }
         ]
       },
