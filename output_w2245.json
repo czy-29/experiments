@@ -1,97 +1,97 @@
 {
-    "proc_id": 18036,
-    "proc_name": "proc_env_json.exe",
-    "host_name": "DESKTOP-W2245",
-    "system": {
-      "name": "Windows",
-      "kernel_version": "19045",
-      "os_version": "10 (19045)",
-      "long_os_version": "Windows 10 Pro for Workstations",
-      "distribution_id": "windows"
+  "proc_id": 18036,
+  "proc_name": "proc_env_json.exe",
+  "host_name": "DESKTOP-W2245",
+  "system": {
+    "name": "Windows",
+    "kernel_version": "19045",
+    "os_version": "10 (19045)",
+    "long_os_version": "Windows 10 Pro for Workstations",
+    "distribution_id": "windows"
+  },
+  "cpu": {
+    "physical_core_count": 8,
+    "logical_core_count": 16,
+    "arch": "x86_64",
+    "frequency": 3912,
+    "vendor_id": "GenuineIntel",
+    "brand": "Intel(R) Xeon(R) W-2245 CPU @ 3.90GHz"
+  },
+  "memory": {
+    "total_memory": 68385013760,
+    "used_memory": 10048929792
+  },
+  "networks": {
+    "VMware Network Adapter VMnet1": {
+      "mac_address": "00:50:56:C0:00:01",
+      "mtu": 1500,
+      "ip_networks": [
+        {
+          "addr": "192.168.233.1",
+          "prefix": 24
+        },
+        {
+          "addr": "fe80::bb2:f29a:7bb2:e95f",
+          "prefix": 64
+        }
+      ]
     },
-    "cpu": {
-      "physical_core_count": 8,
-      "logical_core_count": 16,
-      "arch": "x86_64",
-      "frequency": 3912,
-      "vendor_id": "GenuineIntel",
-      "brand": "Intel(R) Xeon(R) W-2245 CPU @ 3.90GHz"
+    "VMware Network Adapter VMnet8": {
+      "mac_address": "00:50:56:C0:00:08",
+      "mtu": 1500,
+      "ip_networks": [
+        {
+          "addr": "192.168.18.1",
+          "prefix": 24
+        },
+        {
+          "addr": "fe80::16f:7a49:f741:3c3f",
+          "prefix": 64
+        }
+      ]
     },
-    "memory": {
-      "total_memory": 68385013760,
-      "used_memory": 10048929792
+    "WLAN 2": {
+      "mac_address": "98:6E:E8:27:8C:C6",
+      "mtu": 1500,
+      "ip_networks": [
+        {
+          "addr": "192.168.2.8",
+          "prefix": 24
+        },
+        {
+          "addr": "fe80::13d7:4cc:ae28:3a96",
+          "prefix": 64
+        }
+      ]
+    }
+  },
+  "wgpu_adapters": [
+    {
+      "name": "NVIDIA GeForce GTX 1650",
+      "vendor_id": 4318,
+      "device_id": 8584,
+      "device_type": "DiscreteGpu",
+      "driver": "NVIDIA",
+      "driver_info": "560.94",
+      "backend": "Vulkan"
     },
-    "networks": {
-      "VMware Network Adapter VMnet1": {
-        "mac_address": "00:50:56:C0:00:01",
-        "mtu": 1500,
-        "ip_networks": [
-          {
-            "addr": "192.168.233.1",
-            "prefix": 24
-          },
-          {
-            "addr": "fe80::bb2:f29a:7bb2:e95f",
-            "prefix": 64
-          }
-        ]
-      },
-      "VMware Network Adapter VMnet8": {
-        "mac_address": "00:50:56:C0:00:08",
-        "mtu": 1500,
-        "ip_networks": [
-          {
-            "addr": "192.168.18.1",
-            "prefix": 24
-          },
-          {
-            "addr": "fe80::16f:7a49:f741:3c3f",
-            "prefix": 64
-          }
-        ]
-      },
-      "WLAN 2": {
-        "mac_address": "98:6E:E8:27:8C:C6",
-        "mtu": 1500,
-        "ip_networks": [
-          {
-            "addr": "192.168.2.8",
-            "prefix": 24
-          },
-          {
-            "addr": "fe80::13d7:4cc:ae28:3a96",
-            "prefix": 64
-          }
-        ]
-      }
+    {
+      "name": "NVIDIA GeForce GTX 1650",
+      "vendor_id": 4318,
+      "device_id": 8584,
+      "device_type": "DiscreteGpu",
+      "driver": "32.0.15.6094",
+      "driver_info": "",
+      "backend": "Dx12"
     },
-    "wgpu_adapters": [
-      {
-        "name": "NVIDIA GeForce GTX 1650",
-        "vendor_id": 4318,
-        "device_id": 8584,
-        "device_type": "DiscreteGpu",
-        "driver": "NVIDIA",
-        "driver_info": "560.94",
-        "backend": "Vulkan"
-      },
-      {
-        "name": "NVIDIA GeForce GTX 1650",
-        "vendor_id": 4318,
-        "device_id": 8584,
-        "device_type": "DiscreteGpu",
-        "driver": "32.0.15.6094",
-        "driver_info": "",
-        "backend": "Dx12"
-      },
-      {
-        "name": "NVIDIA GeForce GTX 1650/PCIe/SSE2",
-        "vendor_id": 4318,
-        "device_id": 0,
-        "device_type": "Other",
-        "driver": "",
-        "driver_info": "4.6.0 NVIDIA 560.94",
-        "backend": "Gl"
-      }
-    ]
+    {
+      "name": "NVIDIA GeForce GTX 1650/PCIe/SSE2",
+      "vendor_id": 4318,
+      "device_id": 0,
+      "device_type": "Other",
+      "driver": "",
+      "driver_info": "4.6.0 NVIDIA 560.94",
+      "backend": "Gl"
+    }
+  ]
 }
