@@ -1,0 +1,51 @@
+{
+    "proc_id": 3624,
+    "proc_name": "proc_env_json.exe",
+    "host_name": "WIN-0V6OOJAVKE8",
+    "system": {
+        "name": "Windows",
+        "kernel_version": "20348",
+        "os_version": "10 (20348)",
+        "long_os_version": "Windows Server 2022 Datacenter",
+        "distribution_id": "windows"
+    },
+    "cpu": {
+        "physical_core_count": 8,
+        "logical_core_count": 8,
+        "arch": "x86_64",
+        "frequency": 3912,
+        "vendor_id": "GenuineIntel",
+        "brand": "Intel(R) Xeon(R) W-2245 CPU @ 3.90GHz"
+    },
+    "memory": {
+        "total_memory": 17178861568,
+        "used_memory": 2086875136
+    },
+    "networks": {
+        "Ethernet0 2": {
+            "mac_address": "00:0C:29:15:F9:56",
+            "mtu": 1500,
+            "ip_networks": [
+                {
+                    "addr": "192.168.2.11",
+                    "prefix": 24
+                },
+                {
+                    "addr": "fe80::1937:6bdb:55ba:5d88",
+                    "prefix": 64
+                }
+            ]
+        }
+    },
+    "wgpu_adapters": [
+        {
+            "name": "SVGA3D; build: RELEASE;  LLVM;",
+            "vendor_id": 0,
+            "device_id": 0,
+            "device_type": "Other",
+            "driver": "",
+            "driver_info": "4.3 (Compatibility Profile) Mesa 23.2.0 (git-fa8bf4e20e)",
+            "backend": "Gl"
+        }
+    ]
+}
