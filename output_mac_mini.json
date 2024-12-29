@@ -1,0 +1,224 @@
+{
+  "proc_id": 18736,
+  "proc_name": "proc_env_json",
+  "host_name": "192.168.2.23",
+  "system": {
+    "name": "Darwin",
+    "kernel_version": "24.1.0",
+    "os_version": "15.1",
+    "long_os_version": "macOS 15.1 Sequoia",
+    "distribution_id": "macos"
+  },
+  "cpu": {
+    "physical_core_count": 8,
+    "logical_core_count": 8,
+    "arch": "arm64",
+    "frequency": 3504,
+    "vendor_id": "Apple",
+    "brand": "Apple M2"
+  },
+  "memory": {
+    "total_memory": 17179869184,
+    "used_memory": 9277800448
+  },
+  "networks": {
+    "anpi0": {
+      "mac_address": "DA:C2:73:76:09:5D",
+      "mtu": 1500,
+      "ip_networks": []
+    },
+    "anpi1": {
+      "mac_address": "DA:C2:73:76:09:5E",
+      "mtu": 1500,
+      "ip_networks": []
+    },
+    "ap1": {
+      "mac_address": "DA:C7:30:41:13:26",
+      "mtu": 1500,
+      "ip_networks": []
+    },
+    "awdl0": {
+      "mac_address": "A6:FE:3D:7A:7D:1F",
+      "mtu": 1500,
+      "ip_networks": [
+        {
+          "addr": "fe80::a4fe:3dff:fe7a:7d1f",
+          "prefix": 64
+        }
+      ]
+    },
+    "bridge0": {
+      "mac_address": "00:00:00:00:00:00",
+      "mtu": 1500,
+      "ip_networks": []
+    },
+    "en0": {
+      "mac_address": "18:4A:53:13:44:41",
+      "mtu": 1500,
+      "ip_networks": []
+    },
+    "en1": {
+      "mac_address": "9A:64:97:38:B1:DA",
+      "mtu": 1500,
+      "ip_networks": [
+        {
+          "addr": "192.168.2.23",
+          "prefix": 24
+        },
+        {
+          "addr": "fe80::107b:4063:4021:ca33",
+          "prefix": 64
+        }
+      ]
+    },
+    "en2": {
+      "mac_address": "36:9A:C9:A5:DD:80",
+      "mtu": 1500,
+      "ip_networks": []
+    },
+    "en3": {
+      "mac_address": "36:9A:C9:A5:DD:84",
+      "mtu": 1500,
+      "ip_networks": []
+    },
+    "en4": {
+      "mac_address": "DA:C2:73:76:09:3D",
+      "mtu": 1500,
+      "ip_networks": []
+    },
+    "en5": {
+      "mac_address": "DA:C2:73:76:09:3E",
+      "mtu": 1500,
+      "ip_networks": []
+    },
+    "gif0": {
+      "mac_address": "00:00:00:00:00:00",
+      "mtu": 1280,
+      "ip_networks": []
+    },
+    "llw0": {
+      "mac_address": "A6:FE:3D:7A:7D:1F",
+      "mtu": 1500,
+      "ip_networks": [
+        {
+          "addr": "fe80::a4fe:3dff:fe7a:7d1f",
+          "prefix": 64
+        }
+      ]
+    },
+    "lo0": {
+      "mac_address": "00:00:00:00:00:00",
+      "mtu": 16384,
+      "ip_networks": [
+        {
+          "addr": "127.0.0.1",
+          "prefix": 8
+        },
+        {
+          "addr": "::1",
+          "prefix": 128
+        },
+        {
+          "addr": "fe80::1",
+          "prefix": 64
+        }
+      ]
+    },
+    "stf0": {
+      "mac_address": "00:00:00:00:00:00",
+      "mtu": 1280,
+      "ip_networks": []
+    },
+    "utun0": {
+      "mac_address": "00:00:00:00:00:00",
+      "mtu": 1500,
+      "ip_networks": [
+        {
+          "addr": "fe80::3b5c:d76:2fe0:7200",
+          "prefix": 64
+        }
+      ]
+    },
+    "utun1": {
+      "mac_address": "00:00:00:00:00:00",
+      "mtu": 1380,
+      "ip_networks": [
+        {
+          "addr": "fe80::3c19:e3d6:e3e0:78d8",
+          "prefix": 64
+        }
+      ]
+    },
+    "utun2": {
+      "mac_address": "00:00:00:00:00:00",
+      "mtu": 2000,
+      "ip_networks": [
+        {
+          "addr": "fe80::785f:d032:a75a:3e2f",
+          "prefix": 64
+        }
+      ]
+    },
+    "utun3": {
+      "mac_address": "00:00:00:00:00:00",
+      "mtu": 1000,
+      "ip_networks": [
+        {
+          "addr": "fe80::ce81:b1c:bd2c:69e",
+          "prefix": 64
+        }
+      ]
+    },
+    "utun4": {
+      "mac_address": "00:00:00:00:00:00",
+      "mtu": 1380,
+      "ip_networks": [
+        {
+          "addr": "fe80::8c95:8a79:b523:16ed",
+          "prefix": 64
+        }
+      ]
+    },
+    "utun5": {
+      "mac_address": "00:00:00:00:00:00",
+      "mtu": 1380,
+      "ip_networks": [
+        {
+          "addr": "fe80::97cd:d50:6b79:c71a",
+          "prefix": 64
+        }
+      ]
+    },
+    "utun6": {
+      "mac_address": "00:00:00:00:00:00",
+      "mtu": 1380,
+      "ip_networks": [
+        {
+          "addr": "fe80::830a:7d22:7f1f:2c9d",
+          "prefix": 64
+        }
+      ]
+    },
+    "utun7": {
+      "mac_address": "00:00:00:00:00:00",
+      "mtu": 1380,
+      "ip_networks": [
+        {
+          "addr": "fe80::2687:83a8:f6b5:cb06",
+          "prefix": 64
+        }
+      ]
+    }
+  },
+  "wgpu_adapters": [
+    {
+      "name": "Apple M2",
+      "vendor_id": 0,
+      "device_id": 0,
+      "device_type": "IntegratedGpu",
+      "driver": "",
+      "driver_info": "",
+      "backend": "Metal"
+    }
+  ]
+}
