@@ -1,5 +1,5 @@
 {
-    "proc_id": 39280,
+    "proc_id": 27864,
     "proc_name": "proc_env_json.exe",
     "host_name": "DESKTOP-AO1H1A7",
     "system": {
@@ -19,41 +19,24 @@
     },
     "memory": {
       "total_memory": 34185707520,
-      "used_memory": 20445204480
+      "used_memory": 19781365760
     },
-    "networks": [
-      {
-        "name": "WLAN",
-        "mac_address": "6c:a1:00:07:2b:11",
-        "mtu": 1500,
-        "ip_networks": [
-          {
-            "addr": "fe80::1c6a:e036:e09a:5d21",
-            "prefix": 64
-          },
-          {
-            "addr": "192.168.2.26",
-            "prefix": 24
-          }
-        ]
-      },
-      {
-        "name": "VMware Network Adapter VMnet1",
+    "networks": {
+      "VMware Network Adapter VMnet1": {
         "mac_address": "00:50:56:c0:00:01",
         "mtu": 1500,
         "ip_networks": [
           {
-            "addr": "192.168.107.1",
-            "prefix": 24
-          },
-          {
             "addr": "fe80::de35:7c8d:7405:6bab",
             "prefix": 64
+          },
+          {
+            "addr": "192.168.107.1",
+            "prefix": 24
           }
         ]
       },
-      {
-        "name": "VMware Network Adapter VMnet8",
+      "VMware Network Adapter VMnet8": {
         "mac_address": "00:50:56:c0:00:08",
         "mtu": 1500,
         "ip_networks": [
@@ -67,22 +50,21 @@
           }
         ]
       },
-      {
-        "name": "outline-tap0",
-        "mac_address": "00:ff:83:74:70:9b",
+      "WLAN": {
+        "mac_address": "6c:a1:00:07:2b:11",
         "mtu": 1500,
         "ip_networks": [
           {
-            "addr": "fe80::411:1676:abb9:e633",
-            "prefix": 64
+            "addr": "192.168.2.26",
+            "prefix": 24
           },
           {
-            "addr": "10.0.85.2",
-            "prefix": 32
+            "addr": "fe80::1c6a:e036:e09a:5d21",
+            "prefix": 64
           }
         ]
       }
-    ],
+    },
     "wgpu_adapters": [
       {
         "name": "Intel(R) Iris(R) Xe Graphics",
