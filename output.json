@@ -1,5 +1,5 @@
 {
-    "proc_id": 36400,
+    "proc_id": 39280,
     "proc_name": "proc_env_json.exe",
     "host_name": "DESKTOP-AO1H1A7",
     "system": {
@@ -19,7 +19,7 @@
     },
     "memory": {
       "total_memory": 34185707520,
-      "used_memory": 19290341376
+      "used_memory": 20445204480
     },
     "networks": [
       {
@@ -33,21 +33,6 @@
           },
           {
             "addr": "192.168.2.26",
-            "prefix": 24
-          }
-        ]
-      },
-      {
-        "name": "VMware Network Adapter VMnet8",
-        "mac_address": "00:50:56:c0:00:08",
-        "mtu": 1500,
-        "ip_networks": [
-          {
-            "addr": "fe80::605e:aa4b:2224:3ee7",
-            "prefix": 64
-          },
-          {
-            "addr": "192.168.58.1",
             "prefix": 24
           }
         ]
@@ -68,17 +53,32 @@
         ]
       },
       {
+        "name": "VMware Network Adapter VMnet8",
+        "mac_address": "00:50:56:c0:00:08",
+        "mtu": 1500,
+        "ip_networks": [
+          {
+            "addr": "fe80::605e:aa4b:2224:3ee7",
+            "prefix": 64
+          },
+          {
+            "addr": "192.168.58.1",
+            "prefix": 24
+          }
+        ]
+      },
+      {
         "name": "outline-tap0",
         "mac_address": "00:ff:83:74:70:9b",
         "mtu": 1500,
         "ip_networks": [
           {
-            "addr": "10.0.85.2",
-            "prefix": 32
-          },
-          {
             "addr": "fe80::411:1676:abb9:e633",
             "prefix": 64
+          },
+          {
+            "addr": "10.0.85.2",
+            "prefix": 32
           }
         ]
       }
