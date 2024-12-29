@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr, IfIsHumanReadable};
 use std::{fmt, net::IpAddr, str::FromStr};
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, Networks, RefreshKind, System};
+use tokio::task::{spawn_blocking, JoinError};
 use wgpu::{Backend, Backends, Dx12Compiler, Instance, InstanceDescriptor, InstanceFlags};
 
 // Need to gate this under `experimental` feature flag.
@@ -285,10 +286,15 @@ impl ProcEnv {
             wgpu_adapters,
         }
     }
+
+    pub async fn create_async() -> Result<Self, JoinError> {
+        spawn_blocking(ProcEnv::create).await
+    }
 }
 
-fn main() {
-    let proc_env = ProcEnv::create();
+#[tokio::main]
+async fn main() {
+    let proc_env = ProcEnv::create_async().await.unwrap();
     let json = serde_json::to_string_pretty(&proc_env).unwrap();
 
     assert_eq!(
