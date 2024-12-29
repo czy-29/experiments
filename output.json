@@ -1,0 +1,133 @@
+{
+    "proc_id": 36400,
+    "proc_name": "proc_env_json.exe",
+    "host_name": "DESKTOP-AO1H1A7",
+    "system": {
+      "name": "Windows",
+      "kernel_version": "19045",
+      "os_version": "10 (19045)",
+      "long_os_version": "Windows 10 Pro",
+      "distribution_id": "windows"
+    },
+    "cpu": {
+      "physical_core_count": 4,
+      "logical_core_count": 8,
+      "arch": "x86_64",
+      "frequency": 3302,
+      "vendor_id": "GenuineIntel",
+      "brand": "11th Gen Intel(R) Core(TM) i7-11370H @ 3.30GHz"
+    },
+    "memory": {
+      "total_memory": 34185707520,
+      "used_memory": 19290341376
+    },
+    "networks": [
+      {
+        "name": "WLAN",
+        "mac_address": "6c:a1:00:07:2b:11",
+        "mtu": 1500,
+        "ip_networks": [
+          {
+            "addr": "fe80::1c6a:e036:e09a:5d21",
+            "prefix": 64
+          },
+          {
+            "addr": "192.168.2.26",
+            "prefix": 24
+          }
+        ]
+      },
+      {
+        "name": "VMware Network Adapter VMnet8",
+        "mac_address": "00:50:56:c0:00:08",
+        "mtu": 1500,
+        "ip_networks": [
+          {
+            "addr": "fe80::605e:aa4b:2224:3ee7",
+            "prefix": 64
+          },
+          {
+            "addr": "192.168.58.1",
+            "prefix": 24
+          }
+        ]
+      },
+      {
+        "name": "VMware Network Adapter VMnet1",
+        "mac_address": "00:50:56:c0:00:01",
+        "mtu": 1500,
+        "ip_networks": [
+          {
+            "addr": "192.168.107.1",
+            "prefix": 24
+          },
+          {
+            "addr": "fe80::de35:7c8d:7405:6bab",
+            "prefix": 64
+          }
+        ]
+      },
+      {
+        "name": "outline-tap0",
+        "mac_address": "00:ff:83:74:70:9b",
+        "mtu": 1500,
+        "ip_networks": [
+          {
+            "addr": "10.0.85.2",
+            "prefix": 32
+          },
+          {
+            "addr": "fe80::411:1676:abb9:e633",
+            "prefix": 64
+          }
+        ]
+      }
+    ],
+    "wgpu_adapters": [
+      {
+        "name": "Intel(R) Iris(R) Xe Graphics",
+        "vendor_id": 32902,
+        "device_id": 39497,
+        "device_type": "IntegratedGpu",
+        "driver": "Intel Corporation",
+        "driver_info": "Intel driver",
+        "backend": "Vulkan"
+      },
+      {
+        "name": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+        "vendor_id": 4318,
+        "device_id": 9632,
+        "device_type": "DiscreteGpu",
+        "driver": "NVIDIA",
+        "driver_info": "551.61",
+        "backend": "Vulkan"
+      },
+      {
+        "name": "Intel(R) Iris(R) Xe Graphics",
+        "vendor_id": 32902,
+        "device_id": 39497,
+        "device_type": "IntegratedGpu",
+        "driver": "31.0.101.4502",
+        "driver_info": "",
+        "backend": "Dx12"
+      },
+      {
+        "name": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+        "vendor_id": 4318,
+        "device_id": 9632,
+        "device_type": "DiscreteGpu",
+        "driver": "31.0.15.5161",
+        "driver_info": "",
+        "backend": "Dx12"
+      },
+      {
+        "name": "Intel(R) Iris(R) Xe Graphics",
+        "vendor_id": 32902,
+        "device_id": 0,
+        "device_type": "IntegratedGpu",
+        "driver": "",
+        "driver_info": "4.6.0 - Build 31.0.101.4502",
+        "backend": "Gl"
+      }
+    ]
+}
