@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr, IfIsHumanReadable};
-use std::{fmt, net::IpAddr, str::FromStr};
+use std::{fmt, net::IpAddr, str::FromStr, time::Instant};
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, Networks, RefreshKind, System};
 use tokio::task::{spawn_blocking, JoinError};
 use wgpu::{Backend, Backends, Dx12Compiler, Instance, InstanceDescriptor, InstanceFlags};
@@ -261,19 +261,43 @@ pub struct ProcEnv {
 
 impl ProcEnv {
     pub fn create() -> Self {
+        let total_time = Instant::now();
+
+        let sys_time = Instant::now();
         let proc_id = std::process::id();
         let proc_name = current_exe_name().ok();
         let host_name = System::host_name();
         let system = SystemEnv::create();
+        println!("sys_time: {} s", sys_time.elapsed().as_secs_f64());
+
+        let cpu_mem_create_time = Instant::now();
         let sys = System::new_with_specifics(
             RefreshKind::default()
                 .with_memory(MemoryRefreshKind::default().with_ram())
                 .with_cpu(CpuRefreshKind::default().with_frequency()),
         );
+        println!(
+            "cpu_mem_create_time: {} s",
+            cpu_mem_create_time.elapsed().as_secs_f64()
+        );
+
+        let cpu_mem_fetch_time = Instant::now();
         let cpu = CpuEnv::create(&sys);
         let memory = MemoryEnv::create(&sys);
+        println!(
+            "cpu_mem_fetch_time: {} s",
+            cpu_mem_fetch_time.elapsed().as_secs_f64()
+        );
+
+        let net_time = Instant::now();
         let networks = NetworkEnv::create_map();
+        println!("net_time: {} s", net_time.elapsed().as_secs_f64());
+
+        let wgpu_time = Instant::now();
         let wgpu_adapters = GpuEnv::create_list();
+        println!("wgpu_time: {} s", wgpu_time.elapsed().as_secs_f64());
+
+        println!("total_time: {} s", total_time.elapsed().as_secs_f64());
 
         Self {
             proc_id,
