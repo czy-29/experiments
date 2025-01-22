@@ -1,9 +1,11 @@
 use std::{
+    cell::RefCell,
     future::Future,
     pin::Pin,
+    process::Termination,
     sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender},
     task::{Context, Poll},
-    thread::{self, JoinHandle},
+    thread::{self, JoinHandle, LocalKey},
     time::Duration,
 };
 
@@ -70,30 +72,30 @@ impl Future for Sleep {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match &self.handles {
-            Some(handles) => if self.done {
-                panic!("cannot continue polling after sleep returns");
-            } else {
-                match handles.elapsed.try_recv() {
-                    Err(_) => Poll::Pending,
-                    Ok(_) => {
-                        self.done = true;
-                        Poll::Ready(())
+            Some(handles) => {
+                if self.done {
+                    panic!("cannot continue polling after sleep returns");
+                } else {
+                    match handles.elapsed.try_recv() {
+                        Err(_) => Poll::Pending,
+                        Ok(_) => {
+                            self.done = true;
+                            Poll::Ready(())
+                        }
                     }
                 }
-            },
+            }
             None => {
                 let (notify, elapsed) = channel();
                 let (sleep_cancel, sleep_wait) = channel();
                 let dur = self.dur;
                 let waker = cx.waker().clone();
-                let thread = thread::spawn(move || {
-                    match sleep_wait.recv_timeout(dur) {
-                        Ok(_) => unreachable!(),
-                        Err(RecvTimeoutError::Disconnected) => (),
-                        Err(RecvTimeoutError::Timeout) => {
-                            if notify.send(()).is_ok() {
-                                waker.wake();
-                            }
+                let thread = thread::spawn(move || match sleep_wait.recv_timeout(dur) {
+                    Ok(_) => unreachable!(),
+                    Err(RecvTimeoutError::Disconnected) => (),
+                    Err(RecvTimeoutError::Timeout) => {
+                        if notify.send(()).is_ok() {
+                            waker.wake();
                         }
                     }
                 });
@@ -111,12 +113,106 @@ impl Future for Sleep {
 }
 
 pub fn sleep(dur: Duration) -> Sleep {
-    Sleep { dur, handles: None, done: false }
+    Sleep {
+        dur,
+        handles: None,
+        done: false,
+    }
 }
 
-// task, spawn(poll_immediate: Option<bool>), runtime
+// task, spawn(poll_immediate: Option<bool>), runtime, waker
 // rand, with_cancel_signal(tokio::signal::ctrlc)
 
-fn main() {
+thread_local! {
+    static RT: RefCell<Option<Runtime>> = Default::default();
+}
+
+#[derive(Debug, Clone)]
+pub struct Runtime;
+
+impl Runtime {
+    pub fn current() -> Option<Self> {
+        RT.cloned()
+    }
+}
+
+#[derive(Debug)]
+pub struct SetGuard<T: 'static> {
+    key: &'static LocalKey<RefCell<T>>,
+    old: Option<T>,
+}
+
+impl<T: 'static> SetGuard<T> {
+    fn new(key: &'static LocalKey<RefCell<T>>, value: T) -> Self {
+        let old = Some(key.replace(value));
+        Self { key, old }
+    }
+}
+
+impl<T: 'static + Clone> SetGuard<T> {
+    pub fn cloned(&self) -> T {
+        self.key.cloned()
+    }
+}
+
+impl<T: 'static> Drop for SetGuard<T> {
+    fn drop(&mut self) {
+        self.key.replace(self.old.take().unwrap());
+    }
+}
+
+pub trait LocalKeyExt<T: Clone> {
+    fn cloned(&'static self) -> T;
+}
+
+impl<T: Clone> LocalKeyExt<T> for LocalKey<RefCell<T>> {
+    fn cloned(&'static self) -> T {
+        self.with_borrow(Clone::clone)
+    }
+}
+
+pub trait ScopedSet<T> {
+    #[must_use]
+    fn scoped_set(&'static self, value: T) -> SetGuard<T>;
+
+    #[must_use]
+    fn scoped_set_if<P>(&'static self, value: T, predicate: P) -> Option<SetGuard<T>>
+    where
+        P: FnOnce(&T) -> bool;
+}
+
+impl<T> ScopedSet<T> for LocalKey<RefCell<T>> {
+    fn scoped_set(&'static self, value: T) -> SetGuard<T> {
+        SetGuard::new(self, value)
+    }
+
+    fn scoped_set_if<P>(&'static self, value: T, predicate: P) -> Option<SetGuard<T>>
+    where
+        P: FnOnce(&T) -> bool,
+    {
+        if self.with_borrow(predicate) {
+            Some(self.scoped_set(value))
+        } else {
+            None
+        }
+    }
+}
+
+pub trait ScopedSetSome<T> {
+    #[must_use]
+    fn scoped_set_some(&'static self, value: T) -> Option<SetGuard<Option<T>>>;
+}
+
+impl<T> ScopedSetSome<T> for LocalKey<RefCell<Option<T>>> {
+    fn scoped_set_some(&'static self, value: T) -> Option<SetGuard<Option<T>>> {
+        self.scoped_set_if(Some(value), Option::is_none)
+    }
+}
+
+fn main() -> impl Termination {
+    println!("Hello, world!");
+}
+
+async fn async_main() -> impl Termination {
     println!("Hello, world!");
 }
