@@ -1,23 +1,36 @@
+#![forbid(unsafe_code)]
+
 use std::{
+    any::Any,
     cell::RefCell,
+    collections::BTreeMap,
+    fmt::{self, Debug, Formatter},
     future::Future,
     pin::Pin,
     process::Termination,
-    sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender},
-    task::{Context, Poll},
+    rc::Rc,
+    sync::{
+        mpsc::{channel, IntoIter, Receiver, RecvError, RecvTimeoutError, Sender},
+        Arc,
+    },
+    task::{Context, Poll, Wake, Waker},
     thread::{self, JoinHandle, LocalKey},
     time::Duration,
 };
 
-struct WithCancelSignal<F, C> {
-    future: F,
-    cancel: C,
+use rand::random;
+use tokio::signal::ctrl_c;
+
+#[derive(Debug)]
+pub struct WithCancelSignal<F: Future, C: Future> {
+    future: Pin<Box<F>>,
+    cancel: Pin<Box<C>>,
 }
 
 impl<F, C> Future for WithCancelSignal<F, C>
 where
-    F: Future + Unpin,
-    C: Future + Unpin,
+    F: Future,
+    C: Future,
 {
     type Output = Result<F::Output, C::Output>;
 
@@ -34,34 +47,96 @@ where
     }
 }
 
-trait FutureExt: Future + Unpin + Sized {
-    fn with_cancel_signal<C: Future + Unpin>(self, cancel: C) -> WithCancelSignal<Self, C> {
+pub trait FutureExt: Future + Sized {
+    fn with_cancel_signal<C: Future>(self, cancel: C) -> WithCancelSignal<Self, C> {
         WithCancelSignal {
-            future: self,
-            cancel,
+            future: Box::pin(self),
+            cancel: Box::pin(cancel),
         }
     }
 }
 
-impl<T: Future + Unpin + Sized> FutureExt for T {}
+impl<T: Future + Sized> FutureExt for T {}
 
-struct SleepHandles {
-    thread: JoinHandle<()>,
-    elapsed: Receiver<()>,
-    sleep_cancel: Sender<()>,
+pub type BoxAnyLocal = Box<dyn Any>;
+pub type BoxAny = Box<dyn Any + Send>;
+
+pub type AnyFutureLocal<O> = Pin<Box<dyn Future<Output = O>>>;
+pub type AnyFuture<O> = Pin<Box<dyn Future<Output = O> + Send>>;
+
+pub type AnyFutureLocalAnyLocal = AnyFutureLocal<BoxAnyLocal>;
+pub type AnyFutureLocalAny = AnyFutureLocal<BoxAny>;
+pub type AnyFutreAnyLocal = AnyFuture<BoxAnyLocal>; // 这东西不一定真的存在
+pub type AnyFutureAny = AnyFuture<BoxAny>;
+
+pub fn any_future_local_any_local<T>(future: T) -> AnyFutureLocalAnyLocal
+where
+    T: Future + 'static,
+{
+    Box::pin(async move { Box::new(future.await) as _ })
 }
 
+pub fn any_future_local_any<T>(future: T) -> AnyFutureLocalAny
+where
+    T: Future + 'static,
+    T::Output: Send,
+{
+    Box::pin(async move { Box::new(future.await) as _ })
+}
+
+pub fn any_future_any_local<T>(future: T) -> AnyFutreAnyLocal
+where
+    T: Future + Send + 'static,
+{
+    Box::pin(async move { Box::new(future.await) as _ })
+}
+
+pub fn any_future_any<T>(future: T) -> AnyFutureAny
+where
+    T: Future + Send + 'static,
+    T::Output: Send,
+{
+    Box::pin(async move { Box::new(future.await) as _ })
+}
+
+use self::any_future_local_any as rt_future;
+use self::AnyFutureLocalAny as RtFuture;
+use self::BoxAny as RtOutput;
+
+#[derive(Debug)]
+struct FutureHandles<T> {
+    thread: JoinHandle<()>,
+    output: Receiver<T>,
+    cancelable_sender: Sender<Result<RtOutput, ()>>,
+}
+
+#[derive(Debug)]
 pub struct Sleep {
     dur: Duration,
-    handles: Option<SleepHandles>,
+    handles: Option<FutureHandles<()>>,
     done: bool,
+}
+
+impl Sleep {
+    pub fn dur(&self) -> Duration {
+        self.dur
+    }
+
+    pub fn is_elapsed(&self) -> bool {
+        self.done
+            || match &self.handles {
+                None => true,
+                Some(handles) => handles.thread.is_finished(),
+            }
+    }
 }
 
 impl Drop for Sleep {
     fn drop(&mut self) {
         if let Some(handles) = self.handles.take() {
-            drop(handles.elapsed);
-            drop(handles.sleep_cancel);
+            drop(handles.output);
+            handles.cancelable_sender.send(Err(())).ok();
+            drop(handles.cancelable_sender);
             handles.thread.join().ok();
         }
     }
@@ -74,9 +149,9 @@ impl Future for Sleep {
         match &self.handles {
             Some(handles) => {
                 if self.done {
-                    panic!("cannot continue polling after sleep returns");
+                    panic!("cannot continue polling after future returns");
                 } else {
-                    match handles.elapsed.try_recv() {
+                    match handles.output.try_recv() {
                         Err(_) => Poll::Pending,
                         Ok(_) => {
                             self.done = true;
@@ -86,23 +161,23 @@ impl Future for Sleep {
                 }
             }
             None => {
-                let (notify, elapsed) = channel();
-                let (sleep_cancel, sleep_wait) = channel();
+                let (notify, output) = channel();
+                let (cancelable_sender, cancelable_waiter) = channel();
                 let dur = self.dur;
                 let waker = cx.waker().clone();
-                let thread = thread::spawn(move || match sleep_wait.recv_timeout(dur) {
-                    Ok(_) => unreachable!(),
-                    Err(RecvTimeoutError::Disconnected) => (),
+                let thread = thread::spawn(move || match cancelable_waiter.recv_timeout(dur) {
+                    Ok(Ok(_)) => unreachable!(),
+                    Ok(Err(())) | Err(RecvTimeoutError::Disconnected) => (),
                     Err(RecvTimeoutError::Timeout) => {
                         if notify.send(()).is_ok() {
                             waker.wake();
                         }
                     }
                 });
-                let handles = SleepHandles {
+                let handles = FutureHandles {
                     thread,
-                    elapsed,
-                    sleep_cancel,
+                    output,
+                    cancelable_sender,
                 };
 
                 self.handles = Some(handles);
@@ -120,23 +195,336 @@ pub fn sleep(dur: Duration) -> Sleep {
     }
 }
 
-// task, spawn(poll_immediate: Option<bool>), runtime, waker
-// rand, with_cancel_signal(tokio::signal::ctrlc)
+#[derive(Debug)]
+pub struct Task<T: Send + 'static> {
+    id: u64,
+    handles: Option<FutureHandles<T>>,
+    done: bool,
+    output_channel: Option<(Sender<Result<RtOutput, ()>>, Receiver<Result<RtOutput, ()>>)>,
+}
+
+impl<T: Send + 'static> Task<T> {
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+
+    pub fn is_finished(&self) -> bool {
+        self.done
+            || match &self.handles {
+                None => true,
+                Some(handles) => handles.thread.is_finished(),
+            }
+    }
+}
+
+impl<T: Send + 'static> Drop for Task<T> {
+    fn drop(&mut self) {
+        if let Some(handles) = self.handles.take() {
+            drop(handles.output);
+            handles.cancelable_sender.send(Err(())).ok();
+            drop(handles.cancelable_sender);
+            handles.thread.join().ok();
+        }
+    }
+}
+
+impl<T: Send + 'static> Future for Task<T> {
+    type Output = T;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match &self.handles {
+            Some(handles) => {
+                if self.done {
+                    panic!("cannot continue polling after future returns");
+                } else {
+                    match handles.output.try_recv() {
+                        Err(_) => Poll::Pending,
+                        Ok(output) => {
+                            self.done = true;
+                            Poll::Ready(output)
+                        }
+                    }
+                }
+            }
+            None => {
+                let (notify, output) = channel();
+                let (cancelable_sender, cancelable_waiter) = self.output_channel.take().unwrap();
+                let waker = cx.waker().clone();
+                let thread = thread::spawn(move || match cancelable_waiter.recv() {
+                    Ok(Err(())) | Err(RecvError) => (),
+                    Ok(Ok(output)) => {
+                        if notify.send(*output.downcast().unwrap()).is_ok() {
+                            waker.wake();
+                        }
+                    }
+                });
+                let handles = FutureHandles {
+                    thread,
+                    output,
+                    cancelable_sender,
+                };
+
+                self.handles = Some(handles);
+                Poll::Pending
+            }
+        }
+    }
+}
+
+fn task<T: Send + 'static>(task_id: u64) -> (Task<T>, Sender<Result<RtOutput, ()>>) {
+    let channel = channel();
+    let sender = channel.0.clone();
+    let task = Task {
+        id: task_id,
+        handles: None,
+        done: false,
+        output_channel: Some(channel),
+    };
+
+    (task, sender)
+}
 
 thread_local! {
     static RT: RefCell<Option<Runtime>> = Default::default();
 }
 
-#[derive(Debug, Clone)]
-pub struct Runtime;
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+enum Event {
+    Spawn,
+    Wake,
+}
 
-impl Runtime {
-    pub fn current() -> Option<Self> {
-        RT.cloned()
+#[derive(Debug, Clone)]
+struct EventSender(Sender<(Event, u64)>);
+
+impl EventSender {
+    fn spawn(&self, task_id: u64) {
+        self.send(Event::Spawn, task_id);
+    }
+
+    fn wake(&self, task_id: u64) {
+        self.send(Event::Wake, task_id);
+    }
+
+    fn send(&self, event: Event, task_id: u64) {
+        self.0.send((event, task_id)).ok();
     }
 }
 
 #[derive(Debug)]
+struct EventReceiver(Receiver<(Event, u64)>);
+
+impl IntoIterator for EventReceiver {
+    type Item = (Event, u64);
+    type IntoIter = IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+fn event_channel() -> (EventSender, EventReceiver) {
+    let (send, recv) = channel();
+    (EventSender(send), EventReceiver(recv))
+}
+
+#[derive(Debug, Clone)]
+struct TaskWaker {
+    sender: EventSender,
+    task_id: u64,
+}
+
+impl Wake for TaskWaker {
+    fn wake(self: Arc<Self>) {
+        self.sender.wake(self.task_id);
+    }
+}
+
+impl From<TaskWaker> for Waker {
+    fn from(value: TaskWaker) -> Self {
+        Arc::new(value).into()
+    }
+}
+
+struct TaskContext {
+    id: u64,
+    waker: Waker,
+    sender: Sender<Result<RtOutput, ()>>,
+    future: RtFuture,
+}
+
+impl TaskContext {
+    fn poll(&mut self) -> Poll<RtOutput> {
+        self.future
+            .as_mut()
+            .poll(&mut Context::from_waker(&self.waker))
+    }
+}
+
+impl Debug for TaskContext {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TaskContext")
+            .field("id", &self.id)
+            .field("waker", &self.waker)
+            .field("sender", &self.sender)
+            .field("future", &"RtFuture")
+            .finish()
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct TaskMap(Rc<RefCell<BTreeMap<u64, TaskContext>>>);
+
+impl TaskMap {
+    fn push_task(&self, task_context: TaskContext) {
+        self.0.borrow_mut().insert(task_context.id, task_context);
+    }
+
+    fn remove_task(&self, task_id: u64) -> TaskContext {
+        self.0.borrow_mut().remove(&task_id).unwrap()
+    }
+
+    fn exists(&self, task_id: u64) -> bool {
+        self.0.borrow().contains_key(&task_id)
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct IdGen(Rc<RefCell<u64>>);
+
+impl IdGen {
+    fn next(&self) -> u64 {
+        let next_id = *self.0.borrow();
+        *self.0.borrow_mut() += 1;
+        next_id
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Runtime {
+    id_gen: IdGen,
+    event_sender: EventSender,
+    task_map: TaskMap,
+}
+
+impl Runtime {
+    pub fn try_current() -> Option<Self> {
+        RT.cloned()
+    }
+
+    pub fn current() -> Self {
+        Self::try_current().expect("runtime has not been started")
+    }
+
+    pub fn main<T>(spin_on_wake: bool, entry_future: T) -> T::Output
+    where
+        T: Future + 'static,
+        T::Output: Termination + Send,
+    {
+        let (rt, event_recver) = Self::new();
+        let _guard = RT
+            .scoped_set_some(rt)
+            .expect("cannot create another runtime within a runtime");
+
+        {
+            let rt = Self::current();
+            let (task_context, _) = rt.new_task(entry_future);
+            rt.push_task(task_context, true);
+        }
+
+        for (event, task_id) in event_recver {
+            if !Self::current().task_map.exists(task_id) {
+                continue;
+            }
+
+            let mut task_context = Self::current().task_map.remove_task(task_id);
+
+            match task_context.poll() {
+                Poll::Ready(output) => {
+                    if task_id == 0 {
+                        return *output.downcast().unwrap();
+                    } else {
+                        task_context.sender.send(Ok(output)).ok();
+                    }
+                }
+                Poll::Pending => match event {
+                    Event::Spawn => {
+                        Self::current().task_map.push_task(task_context);
+                    }
+                    Event::Wake => {
+                        if spin_on_wake {
+                            let output = loop {
+                                if let Poll::Ready(output) = task_context.poll() {
+                                    break output;
+                                }
+                            };
+
+                            if task_id == 0 {
+                                return *output.downcast().unwrap();
+                            } else {
+                                task_context.sender.send(Ok(output)).ok();
+                            }
+                        } else {
+                            let rt = Self::current();
+                            rt.task_map.push_task(task_context);
+                            rt.event_sender.wake(task_id);
+                        }
+                    }
+                },
+            }
+        }
+
+        unreachable!()
+    }
+
+    fn new() -> (Self, EventReceiver) {
+        let (event_sender, event_recver) = event_channel();
+        let runtime = Self {
+            id_gen: Default::default(),
+            event_sender,
+            task_map: Default::default(),
+        };
+
+        (runtime, event_recver)
+    }
+
+    fn waker(&self, task_id: u64) -> Waker {
+        let sender = self.event_sender.clone();
+        TaskWaker { sender, task_id }.into()
+    }
+
+    fn new_task<T>(&self, future: T) -> (TaskContext, Task<T::Output>)
+    where
+        T: Future + 'static,
+        T::Output: Send,
+    {
+        let id = self.id_gen.next();
+        let waker = self.waker(id);
+        let (task, sender) = task(id);
+        let future = rt_future(future);
+        let task_context = TaskContext {
+            id,
+            waker,
+            sender,
+            future,
+        };
+
+        (task_context, task)
+    }
+
+    fn push_task(&self, task_context: TaskContext, spawn: bool) {
+        let task_id = task_context.id;
+
+        self.task_map.push_task(task_context);
+
+        if spawn {
+            self.event_sender.spawn(task_id);
+        }
+    }
+}
+
+#[derive(Debug)]
+#[must_use]
 pub struct SetGuard<T: 'static> {
     key: &'static LocalKey<RefCell<T>>,
     old: Option<T>,
@@ -172,10 +560,8 @@ impl<T: Clone> LocalKeyExt<T> for LocalKey<RefCell<T>> {
 }
 
 pub trait ScopedSet<T> {
-    #[must_use]
     fn scoped_set(&'static self, value: T) -> SetGuard<T>;
 
-    #[must_use]
     fn scoped_set_if<P>(&'static self, value: T, predicate: P) -> Option<SetGuard<T>>
     where
         P: FnOnce(&T) -> bool;
@@ -199,7 +585,6 @@ impl<T> ScopedSet<T> for LocalKey<RefCell<T>> {
 }
 
 pub trait ScopedSetSome<T> {
-    #[must_use]
     fn scoped_set_some(&'static self, value: T) -> Option<SetGuard<Option<T>>>;
 }
 
@@ -209,10 +594,48 @@ impl<T> ScopedSetSome<T> for LocalKey<RefCell<Option<T>>> {
     }
 }
 
+pub fn spawn<T>(poll_immediate: Option<bool>, future: T) -> Task<T::Output>
+where
+    T: Future + 'static,
+    T::Output: Send,
+{
+    let rt = Runtime::current();
+    let (mut task_context, task) = rt.new_task(future);
+
+    if poll_immediate.unwrap_or_else(random) {
+        match task_context.poll() {
+            Poll::Ready(output) => {
+                task_context.sender.send(Ok(output)).ok();
+            }
+            Poll::Pending => {
+                rt.push_task(task_context, false);
+            }
+        }
+    } else {
+        rt.push_task(task_context, true);
+    }
+
+    task
+}
+
 fn main() -> impl Termination {
-    println!("Hello, world!");
+    Runtime::main(true, async_main())
 }
 
 async fn async_main() -> impl Termination {
-    println!("Hello, world!");
+    println!("start");
+
+    let dur = Duration::from_secs_f64(3.0);
+    let t1 = spawn(None, sleep(dur));
+    let t2 = spawn(None, async move { sleep(dur).await });
+    let join = async move {
+        t1.await;
+        t2.await;
+    };
+
+    join.with_cancel_signal(ctrl_c())
+        .await
+        .inspect(|_| println!("finished"))
+        .inspect_err(|_| println!("ctrl-c"))
+        .ok();
 }

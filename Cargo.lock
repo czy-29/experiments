@@ -376,6 +376,7 @@ version = "0.0.1"
 dependencies = [
  "indexmap 2.7.0",
  "mac_address",
+ "rand",
  "rust_decimal",
  "serde",
  "serde_json",
