@@ -69,11 +69,27 @@ pub type AnyFutureLocalAny = AnyFutureLocal<BoxAny>;
 pub type AnyFutreAnyLocal = AnyFuture<BoxAnyLocal>; // 这东西不一定真的存在
 pub type AnyFutureAny = AnyFuture<BoxAny>;
 
+pub fn any_local<T: 'static>(value: T) -> BoxAnyLocal {
+    Box::new(value) as _
+}
+
+pub fn any_send<T: Send + 'static>(value: T) -> BoxAny {
+    Box::new(value) as _
+}
+
+pub fn force_downcast_local<T: 'static>(local: BoxAnyLocal) -> T {
+    *local.downcast().unwrap()
+}
+
+pub fn force_downcast_any<T: 'static>(any: BoxAny) -> T {
+    *any.downcast().unwrap()
+}
+
 pub fn any_future_local_any_local<T>(future: T) -> AnyFutureLocalAnyLocal
 where
     T: Future + 'static,
 {
-    Box::pin(async move { Box::new(future.await) as _ })
+    Box::pin(async move { any_local(future.await) })
 }
 
 pub fn any_future_local_any<T>(future: T) -> AnyFutureLocalAny
@@ -81,14 +97,14 @@ where
     T: Future + 'static,
     T::Output: Send,
 {
-    Box::pin(async move { Box::new(future.await) as _ })
+    Box::pin(async move { any_send(future.await) })
 }
 
 pub fn any_future_any_local<T>(future: T) -> AnyFutreAnyLocal
 where
     T: Future + Send + 'static,
 {
-    Box::pin(async move { Box::new(future.await) as _ })
+    Box::pin(async move { any_local(future.await) })
 }
 
 pub fn any_future_any<T>(future: T) -> AnyFutureAny
@@ -96,10 +112,11 @@ where
     T: Future + Send + 'static,
     T::Output: Send,
 {
-    Box::pin(async move { Box::new(future.await) as _ })
+    Box::pin(async move { any_send(future.await) })
 }
 
 use self::any_future_local_any as rt_future;
+use self::force_downcast_any as downcast_rt;
 use self::AnyFutureLocalAny as RtFuture;
 use self::BoxAny as RtOutput;
 
@@ -107,7 +124,7 @@ use self::BoxAny as RtOutput;
 struct FutureHandles<T> {
     thread: JoinHandle<()>,
     output: Receiver<T>,
-    cancelable_sender: Sender<Result<RtOutput, ()>>,
+    cancelable_sender: RtSender,
 }
 
 #[derive(Debug)]
@@ -135,7 +152,7 @@ impl Drop for Sleep {
     fn drop(&mut self) {
         if let Some(handles) = self.handles.take() {
             drop(handles.output);
-            handles.cancelable_sender.send(Err(())).ok();
+            handles.cancelable_sender.cancel();
             drop(handles.cancelable_sender);
             handles.thread.join().ok();
         }
@@ -162,13 +179,13 @@ impl Future for Sleep {
             }
             None => {
                 let (notify, output) = channel();
-                let (cancelable_sender, cancelable_waiter) = channel();
+                let (cancelable_sender, cancelable_waiter) = rt_channel();
                 let dur = self.dur;
                 let waker = cx.waker().clone();
-                let thread = thread::spawn(move || match cancelable_waiter.recv_timeout(dur) {
-                    Ok(Ok(_)) => unreachable!(),
-                    Ok(Err(())) | Err(RecvTimeoutError::Disconnected) => (),
-                    Err(RecvTimeoutError::Timeout) => {
+                let thread = thread::spawn(move || match cancelable_waiter.wait_for(dur) {
+                    WaitResult::Output(_) => unreachable!(),
+                    WaitResult::Canceled => (),
+                    WaitResult::Elapsed => {
                         if notify.send(()).is_ok() {
                             waker.wake();
                         }
@@ -200,7 +217,7 @@ pub struct Task<T: Send + 'static> {
     id: u64,
     handles: Option<FutureHandles<T>>,
     done: bool,
-    output_channel: Option<(Sender<Result<RtOutput, ()>>, Receiver<Result<RtOutput, ()>>)>,
+    output_channel: Option<(RtSender, RtWaiter)>,
 }
 
 impl<T: Send + 'static> Task<T> {
@@ -221,7 +238,7 @@ impl<T: Send + 'static> Drop for Task<T> {
     fn drop(&mut self) {
         if let Some(handles) = self.handles.take() {
             drop(handles.output);
-            handles.cancelable_sender.send(Err(())).ok();
+            handles.cancelable_sender.cancel();
             drop(handles.cancelable_sender);
             handles.thread.join().ok();
         }
@@ -250,10 +267,11 @@ impl<T: Send + 'static> Future for Task<T> {
                 let (notify, output) = channel();
                 let (cancelable_sender, cancelable_waiter) = self.output_channel.take().unwrap();
                 let waker = cx.waker().clone();
-                let thread = thread::spawn(move || match cancelable_waiter.recv() {
-                    Ok(Err(())) | Err(RecvError) => (),
-                    Ok(Ok(output)) => {
-                        if notify.send(*output.downcast().unwrap()).is_ok() {
+                let thread = thread::spawn(move || match cancelable_waiter.wait_output() {
+                    WaitResult::Elapsed => unreachable!(),
+                    WaitResult::Canceled => (),
+                    WaitResult::Output(output) => {
+                        if notify.send(downcast_rt(output)).is_ok() {
                             waker.wake();
                         }
                     }
@@ -271,17 +289,17 @@ impl<T: Send + 'static> Future for Task<T> {
     }
 }
 
-fn task<T: Send + 'static>(task_id: u64) -> (Task<T>, Sender<Result<RtOutput, ()>>) {
-    let channel = channel();
-    let sender = channel.0.clone();
+fn task<T: Send + 'static>(task_id: u64) -> (Task<T>, RtSender) {
+    let rt_channel = rt_channel();
+    let rt_sender = rt_channel.0.clone();
     let task = Task {
         id: task_id,
         handles: None,
         done: false,
-        output_channel: Some(channel),
+        output_channel: Some(rt_channel),
     };
 
-    (task, sender)
+    (task, rt_sender)
 }
 
 thread_local! {
@@ -329,6 +347,51 @@ fn event_channel() -> (EventSender, EventReceiver) {
 }
 
 #[derive(Debug, Clone)]
+struct RtSender(Sender<Result<RtOutput, ()>>);
+
+impl RtSender {
+    fn send_output(&self, output: RtOutput) {
+        self.0.send(Ok(output)).ok();
+    }
+
+    fn cancel(&self) {
+        self.0.send(Err(())).ok();
+    }
+}
+
+#[derive(Debug)]
+enum WaitResult {
+    Output(RtOutput),
+    Canceled,
+    Elapsed,
+}
+
+#[derive(Debug)]
+struct RtWaiter(Receiver<Result<RtOutput, ()>>);
+
+impl RtWaiter {
+    fn wait_for(self, dur: Duration) -> WaitResult {
+        match self.0.recv_timeout(dur) {
+            Ok(Ok(output)) => WaitResult::Output(output),
+            Ok(Err(())) | Err(RecvTimeoutError::Disconnected) => WaitResult::Canceled,
+            Err(RecvTimeoutError::Timeout) => WaitResult::Elapsed,
+        }
+    }
+
+    fn wait_output(self) -> WaitResult {
+        match self.0.recv() {
+            Ok(Ok(output)) => WaitResult::Output(output),
+            Ok(Err(())) | Err(RecvError) => WaitResult::Canceled,
+        }
+    }
+}
+
+fn rt_channel() -> (RtSender, RtWaiter) {
+    let (send, recv) = channel();
+    (RtSender(send), RtWaiter(recv))
+}
+
+#[derive(Debug, Clone)]
 struct TaskWaker {
     sender: EventSender,
     task_id: u64,
@@ -349,7 +412,7 @@ impl From<TaskWaker> for Waker {
 struct TaskContext {
     id: u64,
     waker: Waker,
-    sender: Sender<Result<RtOutput, ()>>,
+    sender: RtSender,
     future: RtFuture,
 }
 
@@ -358,6 +421,19 @@ impl TaskContext {
         self.future
             .as_mut()
             .poll(&mut Context::from_waker(&self.waker))
+    }
+
+    fn send_output(&self, output: RtOutput) {
+        self.sender.send_output(output);
+    }
+
+    fn handle_entry<T: 'static>(&self, output: RtOutput) -> Option<T> {
+        if self.id == 0 {
+            Some(downcast_rt(output))
+        } else {
+            self.send_output(output);
+            None
+        }
     }
 }
 
@@ -433,18 +509,20 @@ impl Runtime {
         }
 
         for (event, task_id) in event_recver {
-            if !Self::current().task_map.exists(task_id) {
-                continue;
-            }
+            let mut task_context = {
+                let task_map = &Self::current().task_map;
 
-            let mut task_context = Self::current().task_map.remove_task(task_id);
+                if !task_map.exists(task_id) {
+                    continue;
+                }
+
+                task_map.remove_task(task_id)
+            };
 
             match task_context.poll() {
                 Poll::Ready(output) => {
-                    if task_id == 0 {
-                        return *output.downcast().unwrap();
-                    } else {
-                        task_context.sender.send(Ok(output)).ok();
+                    if let Some(output) = task_context.handle_entry(output) {
+                        return output;
                     }
                 }
                 Poll::Pending => match event {
@@ -459,10 +537,8 @@ impl Runtime {
                                 }
                             };
 
-                            if task_id == 0 {
-                                return *output.downcast().unwrap();
-                            } else {
-                                task_context.sender.send(Ok(output)).ok();
+                            if let Some(output) = task_context.handle_entry(output) {
+                                return output;
                             }
                         } else {
                             let rt = Self::current();
@@ -537,12 +613,6 @@ impl<T: 'static> SetGuard<T> {
     }
 }
 
-impl<T: 'static + Clone> SetGuard<T> {
-    pub fn cloned(&self) -> T {
-        self.key.cloned()
-    }
-}
-
 impl<T: 'static> Drop for SetGuard<T> {
     fn drop(&mut self) {
         self.key.replace(self.old.take().unwrap());
@@ -605,7 +675,7 @@ where
     if poll_immediate.unwrap_or_else(random) {
         match task_context.poll() {
             Poll::Ready(output) => {
-                task_context.sender.send(Ok(output)).ok();
+                task_context.send_output(output);
             }
             Poll::Pending => {
                 rt.push_task(task_context, false);
