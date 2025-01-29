@@ -1,35 +1,72 @@
 use std::thread;
 use tokio::{
-    runtime,
+    runtime::{Handle, RuntimeFlavor},
+    sync::OnceCell,
+    task::JoinHandle,
     time::{sleep, Duration},
 };
 
+static RT_C: OnceCell<Handle> = OnceCell::const_new();
+static RT_M: OnceCell<Handle> = OnceCell::const_new();
+
 fn main() {
-    let handle = thread::spawn(rt2);
-    rt1();
+    let handle = thread::spawn(rt_multi);
+    rt_current();
     handle.join().unwrap();
 }
 
 #[tokio::main(flavor = "current_thread")]
-async fn rt1() {
+async fn rt_current() {
+    RT_C.set(Handle::current()).unwrap();
     run().await;
 }
 
 #[tokio::main]
-async fn rt2() {
+async fn rt_multi() {
+    RT_M.set(Handle::current()).unwrap();
     run().await;
 }
 
 async fn run() {
     sleep_mini().await;
-    print_flavor();
+
+    println!("{:?} spawn begin!", flavor());
+    let h1 = spawn_current();
+    let h2 = spawn_multi();
+    println!("{:?} spawn end!", flavor());
+
+    h1.await.unwrap();
+    h2.await.unwrap();
+    println!("{:?} joined!", flavor());
+
     sleep_mini().await;
+    println!("{:?} finished!", flavor());
 }
 
 async fn sleep_mini() {
-    sleep(Duration::from_secs_f64(0.5)).await;
+    sleep(Duration::from_secs_f64(1.5)).await;
 }
 
-fn print_flavor() {
-    println!("{:?}", runtime::Handle::current().runtime_flavor());
+fn flavor() -> RuntimeFlavor {
+    Handle::current().runtime_flavor()
+}
+
+fn spawn_handle(handle: &Handle) -> JoinHandle<()> {
+    let print_flavor = async {
+        println!("{:?} runs!", flavor());
+    };
+
+    if Handle::current().id() == handle.id() {
+        tokio::spawn(print_flavor)
+    } else {
+        handle.spawn(print_flavor)
+    }
+}
+
+fn spawn_current() -> JoinHandle<()> {
+    spawn_handle(RT_C.get().unwrap())
+}
+
+fn spawn_multi() -> JoinHandle<()> {
+    spawn_handle(RT_M.get().unwrap())
 }
