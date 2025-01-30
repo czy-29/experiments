@@ -52,14 +52,16 @@ fn flavor() -> RuntimeFlavor {
 }
 
 fn spawn_handle(handle: &Handle) -> JoinHandle<()> {
-    let print_flavor = async {
-        println!("{:?} runs!", flavor());
+    let task = async {
+        println!("{:?} run once!", flavor());
+        sleep(Duration::from_nanos(1)).await;
+        println!("{:?} run twice!", flavor());
     };
 
     if Handle::current().id() == handle.id() {
-        tokio::spawn(print_flavor)
+        tokio::spawn(task)
     } else {
-        handle.spawn(print_flavor)
+        handle.spawn(task)
     }
 }
 
