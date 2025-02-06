@@ -1,10 +1,10 @@
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr, IfIsHumanReadable};
-use std::{fmt, net::IpAddr, str::FromStr, time::Instant};
+use std::{fmt, net::IpAddr, process, str::FromStr, time::Instant};
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, Networks, RefreshKind, System};
 use tokio::task::{spawn_blocking, JoinError};
-use wgpu::{Backend, Backends, Dx12Compiler, Instance, InstanceDescriptor, InstanceFlags};
+use wgpu::{Backends, Dx12Compiler, Instance, InstanceDescriptor, InstanceFlags};
 
 // Need to gate this under `experimental` feature flag.
 #[doc(hidden)]
@@ -82,7 +82,7 @@ impl From<IpNetwork> for sysinfo::IpNetwork {
 
 #[repr(u8)]
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Eq, PartialEq, Hash)]
-pub enum DeviceType {
+pub enum GpuDeviceType {
     Other,
     IntegratedGpu,
     DiscreteGpu,
@@ -90,7 +90,7 @@ pub enum DeviceType {
     Cpu,
 }
 
-impl From<wgpu::DeviceType> for DeviceType {
+impl From<wgpu::DeviceType> for GpuDeviceType {
     fn from(device_type: wgpu::DeviceType) -> Self {
         match device_type {
             wgpu::DeviceType::Other => Self::Other,
@@ -102,14 +102,51 @@ impl From<wgpu::DeviceType> for DeviceType {
     }
 }
 
-impl From<DeviceType> for wgpu::DeviceType {
-    fn from(device_type: DeviceType) -> Self {
+impl From<GpuDeviceType> for wgpu::DeviceType {
+    fn from(device_type: GpuDeviceType) -> Self {
         match device_type {
-            DeviceType::Other => Self::Other,
-            DeviceType::IntegratedGpu => Self::IntegratedGpu,
-            DeviceType::DiscreteGpu => Self::DiscreteGpu,
-            DeviceType::VirtualGpu => Self::VirtualGpu,
-            DeviceType::Cpu => Self::Cpu,
+            GpuDeviceType::Other => Self::Other,
+            GpuDeviceType::IntegratedGpu => Self::IntegratedGpu,
+            GpuDeviceType::DiscreteGpu => Self::DiscreteGpu,
+            GpuDeviceType::VirtualGpu => Self::VirtualGpu,
+            GpuDeviceType::Cpu => Self::Cpu,
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Eq, PartialEq, Hash)]
+pub enum GpuBackend {
+    Empty = 0,
+    Vulkan = 1,
+    Metal = 2,
+    Dx12 = 3,
+    Gl = 4,
+    BrowserWebGpu = 5,
+}
+
+impl From<wgpu::Backend> for GpuBackend {
+    fn from(backend: wgpu::Backend) -> Self {
+        match backend {
+            wgpu::Backend::Empty => Self::Empty,
+            wgpu::Backend::Vulkan => Self::Vulkan,
+            wgpu::Backend::Metal => Self::Metal,
+            wgpu::Backend::Dx12 => Self::Dx12,
+            wgpu::Backend::Gl => Self::Gl,
+            wgpu::Backend::BrowserWebGpu => Self::BrowserWebGpu,
+        }
+    }
+}
+
+impl From<GpuBackend> for wgpu::Backend {
+    fn from(backend: GpuBackend) -> Self {
+        match backend {
+            GpuBackend::Empty => Self::Empty,
+            GpuBackend::Vulkan => Self::Vulkan,
+            GpuBackend::Metal => Self::Metal,
+            GpuBackend::Dx12 => Self::Dx12,
+            GpuBackend::Gl => Self::Gl,
+            GpuBackend::BrowserWebGpu => Self::BrowserWebGpu,
         }
     }
 }
@@ -124,7 +161,7 @@ pub struct SystemEnv {
 }
 
 impl SystemEnv {
-    pub fn create() -> Self {
+    fn create() -> Self {
         Self {
             name: System::name(),
             kernel_version: System::kernel_version(),
@@ -146,7 +183,7 @@ pub struct CpuEnv {
 }
 
 impl CpuEnv {
-    pub fn create(sys: &System) -> Self {
+    fn create(sys: &System) -> Self {
         let cpus = sys.cpus();
         let cpu0 = &cpus[0];
 
@@ -168,7 +205,7 @@ pub struct MemoryEnv {
 }
 
 impl MemoryEnv {
-    pub fn create(sys: &System) -> Self {
+    fn create(sys: &System) -> Self {
         Self {
             total_memory: sys.total_memory(),
             used_memory: sys.used_memory(),
@@ -184,7 +221,7 @@ pub struct NetworkEnv {
 }
 
 impl NetworkEnv {
-    pub fn create_map() -> IndexMap<String, Self> {
+    fn create_map() -> IndexMap<String, Self> {
         let mut map: IndexMap<String, Self> = Networks::new_with_refreshed_list()
             .iter()
             .map(|(k, v)| {
@@ -210,14 +247,14 @@ pub struct GpuEnv {
     pub name: String,
     pub vendor_id: u32,
     pub device_id: u32,
-    pub device_type: DeviceType,
+    pub device_type: GpuDeviceType,
     pub driver: String,
     pub driver_info: String,
-    pub backend: Backend,
+    pub backend: GpuBackend,
 }
 
 impl GpuEnv {
-    pub fn create_list() -> Vec<Self> {
+    fn create_list() -> Vec<Self> {
         let adapters = Instance::new(InstanceDescriptor {
             backends: Backends::all(),
             flags: InstanceFlags::from_build_config(),
@@ -240,7 +277,7 @@ impl GpuEnv {
                     device_type: info.device_type.into(),
                     driver: info.driver,
                     driver_info: info.driver_info,
-                    backend: info.backend,
+                    backend: info.backend.into(),
                 }
             })
             .collect()
@@ -264,7 +301,7 @@ impl ProcEnv {
         let total_time = Instant::now();
 
         let sys_time = Instant::now();
-        let proc_id = std::process::id();
+        let proc_id = process::id();
         let proc_name = current_exe_name().ok();
         let host_name = System::host_name();
         let system = SystemEnv::create();
