@@ -4,7 +4,10 @@ use serde_with::{serde_as, DisplayFromStr, IfIsHumanReadable};
 use std::{fmt, net::IpAddr, process, str::FromStr, time::Instant};
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, Networks, RefreshKind, System};
 use tokio::task::{spawn_blocking, JoinError};
-use wgpu::{Backends, Dx12Compiler, Instance, InstanceDescriptor, InstanceFlags};
+use wgpu::{
+    BackendOptions, Backends, Dx12BackendOptions, Dx12Compiler, Instance, InstanceDescriptor,
+    InstanceFlags,
+};
 
 // Need to gate this under `experimental` feature flag.
 #[doc(hidden)]
@@ -255,14 +258,15 @@ pub struct GpuEnv {
 
 impl GpuEnv {
     fn create_list() -> Vec<Self> {
-        let adapters = Instance::new(InstanceDescriptor {
+        let adapters = Instance::new(&InstanceDescriptor {
             backends: Backends::all(),
             flags: InstanceFlags::from_build_config(),
-            dx12_shader_compiler: Dx12Compiler::Dxc {
-                dxil_path: None,
-                dxc_path: None,
+            backend_options: BackendOptions {
+                gl: Default::default(),
+                dx12: Dx12BackendOptions {
+                    shader_compiler: Dx12Compiler::StaticDxc,
+                },
             },
-            gles_minor_version: Default::default(),
         })
         .enumerate_adapters(Backends::all());
 

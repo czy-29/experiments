@@ -1,6 +1,9 @@
 use rust_decimal::prelude::*;
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, Networks, RefreshKind, System};
-use wgpu::{Backends, Dx12Compiler, Instance, InstanceDescriptor, InstanceFlags};
+use wgpu::{
+    BackendOptions, Backends, Dx12BackendOptions, Dx12Compiler, Instance, InstanceDescriptor,
+    InstanceFlags,
+};
 
 trait ToGbRounded {
     fn to_gb_rounded(self) -> Decimal;
@@ -62,14 +65,15 @@ fn main() {
         }
     }
 
-    let adapters = Instance::new(InstanceDescriptor {
+    let adapters = Instance::new(&InstanceDescriptor {
         backends: Backends::all(),
         flags: InstanceFlags::from_build_config(),
-        dx12_shader_compiler: Dx12Compiler::Dxc {
-            dxil_path: None,
-            dxc_path: None,
+        backend_options: BackendOptions {
+            gl: Default::default(),
+            dx12: Dx12BackendOptions {
+                shader_compiler: Dx12Compiler::StaticDxc,
+            },
         },
-        gles_minor_version: Default::default(),
     })
     .enumerate_adapters(Backends::all());
     println!("");

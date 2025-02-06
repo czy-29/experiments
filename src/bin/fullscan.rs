@@ -29,19 +29,19 @@ async fn main() {
     println!("scanning host: {}", host);
     let mut ports = BTreeSet::new();
 
-    for iters in 0..32 {
-        let start = iters * 2048;
+    for iters in 0..64 {
+        let start = iters * 1024;
 
         println!(
-            "scanning port: {}-{} ({}/32)",
+            "scanning port: {}-{} ({}/64)",
             if start == 0 { 1 } else { start },
-            start + 2047,
+            start + 1023,
             iters + 1
         );
 
         let mut scans = JoinSet::new();
 
-        for index in 0..2048 {
+        for index in 0..1024 {
             let port = start + index;
 
             if port == 0 {
@@ -51,7 +51,7 @@ async fn main() {
             let host = host.clone();
             scans.spawn(async move {
                 match TcpStream::connect((host, port))
-                    .timeout(Duration::from_secs(10))
+                    .timeout(Duration::from_secs(8))
                     .await
                 {
                     Ok(Ok(_)) => {
