@@ -10,7 +10,7 @@ use std::{
     process::Termination,
     rc::Rc,
     sync::{
-        mpsc::{channel, IntoIter, Receiver, RecvError, RecvTimeoutError, Sender},
+        mpsc::{channel, IntoIter, Receiver, RecvError, RecvTimeoutError, Sender, TryRecvError},
         Arc,
     },
     task::{Context, Poll, Wake, Waker},
@@ -249,23 +249,27 @@ impl<T: Send + 'static> Future for Task<T> {
     type Output = T;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if self.done {
+            panic!("cannot continue polling after future returns");
+        }
+
         match &self.handles {
-            Some(handles) => {
-                if self.done {
-                    panic!("cannot continue polling after future returns");
-                } else {
-                    match handles.output.try_recv() {
-                        Err(_) => Poll::Pending,
-                        Ok(output) => {
-                            self.done = true;
-                            Poll::Ready(output)
-                        }
-                    }
+            Some(handles) => match handles.output.try_recv() {
+                Err(_) => unreachable!(),
+                Ok(output) => {
+                    self.done = true;
+                    Poll::Ready(output)
                 }
-            }
+            },
             None => {
-                let (notify, output) = channel();
                 let (cancelable_sender, cancelable_waiter) = self.output_channel.take().unwrap();
+
+                if let Some(WaitResult::Output(output)) = cancelable_waiter.try_wait_output() {
+                    self.done = true;
+                    return Poll::Ready(downcast_rt(output));
+                }
+
+                let (notify, output) = channel();
                 let waker = cx.waker().clone();
                 let thread = thread::spawn(move || match cancelable_waiter.wait_output() {
                     WaitResult::Elapsed => unreachable!(),
@@ -382,6 +386,14 @@ impl RtWaiter {
         match self.0.recv() {
             Ok(Ok(output)) => WaitResult::Output(output),
             Ok(Err(())) | Err(RecvError) => WaitResult::Canceled,
+        }
+    }
+
+    fn try_wait_output(&self) -> Option<WaitResult> {
+        match self.0.try_recv() {
+            Ok(Ok(output)) => Some(WaitResult::Output(output)),
+            Ok(Err(())) | Err(TryRecvError::Disconnected) => Some(WaitResult::Canceled),
+            Err(TryRecvError::Empty) => None,
         }
     }
 }
@@ -696,8 +708,9 @@ async fn async_main() -> impl Termination {
     println!("start");
 
     let dur = Duration::from_secs_f64(3.0);
+    let dur2 = Duration::from_secs_f64(1.5);
     let t1 = spawn(None, sleep(dur));
-    let t2 = spawn(None, async move { sleep(dur).await });
+    let t2 = spawn(None, async move { sleep(dur2).await });
     let join = async move {
         t1.await;
         t2.await;
