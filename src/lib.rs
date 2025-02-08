@@ -1,5 +1,7 @@
 #![cfg_attr(nightly, feature(doc_auto_cfg))]
 
+pub mod sleep;
+
 pub fn add(left: usize, right: usize) -> usize {
     left + right
 }

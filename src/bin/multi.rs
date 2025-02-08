@@ -1,9 +1,10 @@
+use experiments::sleep::sleep;
 use std::thread;
 use tokio::{
     runtime::{Handle, RuntimeFlavor},
     sync::OnceCell,
     task::JoinHandle,
-    time::{sleep, Duration},
+    time::Duration,
 };
 
 static RT_C: OnceCell<Handle> = OnceCell::const_new();
