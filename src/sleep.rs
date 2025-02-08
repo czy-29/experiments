@@ -2,19 +2,47 @@ use std::{
     any::Any,
     future::Future,
     pin::Pin,
-    sync::mpsc::{channel, Receiver, RecvError, RecvTimeoutError, Sender, TryRecvError},
-    task::{Context, Poll},
+    sync::{
+        mpsc::{channel, Receiver, RecvError, RecvTimeoutError, Sender, TryRecvError},
+        Arc, Mutex,
+    },
+    task::{Context, Poll, Waker},
     thread::{self, JoinHandle},
     time::Duration,
 };
 
 pub type RtOutput = Box<dyn Any + Send>;
 
+#[derive(Debug, Clone, Default)]
+pub struct WakerHandle(Arc<Mutex<Option<Waker>>>);
+
+impl WakerHandle {
+    pub fn clear(&self) {
+        self.0.lock().unwrap().take();
+    }
+
+    pub fn update(&self, cx: &mut Context<'_>) {
+        self.0.lock().unwrap().replace(cx.waker().clone());
+    }
+
+    pub fn wake(&self) {
+        let mut guard = self.0.lock().unwrap();
+        guard.take().map(Waker::wake);
+    }
+}
+
+impl From<&mut Context<'_>> for WakerHandle {
+    fn from(cx: &mut Context<'_>) -> Self {
+        Self(Arc::new(Mutex::new(Some(cx.waker().clone()))))
+    }
+}
+
 #[derive(Debug)]
 pub struct FutureHandles<T> {
     pub thread: JoinHandle<()>,
     pub output: Receiver<T>,
     pub cancelable_sender: RtSender,
+    pub waker: WakerHandle,
 }
 
 #[derive(Debug)]
@@ -41,6 +69,7 @@ impl Sleep {
 impl Drop for Sleep {
     fn drop(&mut self) {
         if let Some(handles) = self.handles.take() {
+            handles.waker.clear();
             drop(handles.output);
             handles.cancelable_sender.cancel();
             drop(handles.cancelable_sender);
@@ -59,7 +88,10 @@ impl Future for Sleep {
                     panic!("cannot continue polling after future returns");
                 } else {
                     match handles.output.try_recv() {
-                        Err(_) => Poll::Pending,
+                        Err(_) => {
+                            handles.waker.update(cx);
+                            Poll::Pending
+                        }
                         Ok(_) => {
                             self.done = true;
                             Poll::Ready(())
@@ -71,13 +103,14 @@ impl Future for Sleep {
                 let (notify, output) = channel();
                 let (cancelable_sender, cancelable_waiter) = rt_channel();
                 let dur = self.dur;
-                let waker = cx.waker().clone();
+                let waker = WakerHandle::from(cx);
+                let waker_clone = waker.clone();
                 let thread = thread::spawn(move || match cancelable_waiter.wait_for(dur) {
                     WaitResult::Output(_) => unreachable!(),
                     WaitResult::Canceled => (),
                     WaitResult::Elapsed => {
                         if notify.send(()).is_ok() {
-                            waker.wake();
+                            waker_clone.wake();
                         }
                     }
                 });
@@ -85,6 +118,7 @@ impl Future for Sleep {
                     thread,
                     output,
                     cancelable_sender,
+                    waker,
                 };
 
                 self.handles = Some(handles);

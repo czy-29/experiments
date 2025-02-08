@@ -146,6 +146,7 @@ impl<T: Send + 'static> Task<T> {
 impl<T: Send + 'static> Drop for Task<T> {
     fn drop(&mut self) {
         if let Some(handles) = self.handles.take() {
+            handles.waker.clear();
             drop(handles.output);
             handles.cancelable_sender.cancel();
             drop(handles.cancelable_sender);
@@ -164,7 +165,10 @@ impl<T: Send + 'static> Future for Task<T> {
 
         match &self.handles {
             Some(handles) => match handles.output.try_recv() {
-                Err(_) => Poll::Pending,
+                Err(_) => {
+                    handles.waker.update(cx);
+                    Poll::Pending
+                }
                 Ok(output) => {
                     self.done = true;
                     Poll::Ready(output)
@@ -179,13 +183,14 @@ impl<T: Send + 'static> Future for Task<T> {
                 }
 
                 let (notify, output) = channel();
-                let waker = cx.waker().clone();
+                let waker = WakerHandle::from(cx);
+                let waker_clone = waker.clone();
                 let thread = thread::spawn(move || match cancelable_waiter.wait_output() {
                     WaitResult::Elapsed => unreachable!(),
                     WaitResult::Canceled => (),
                     WaitResult::Output(output) => {
                         if notify.send(downcast_rt(output)).is_ok() {
-                            waker.wake();
+                            waker_clone.wake();
                         }
                     }
                 });
@@ -193,6 +198,7 @@ impl<T: Send + 'static> Future for Task<T> {
                     thread,
                     output,
                     cancelable_sender,
+                    waker,
                 };
 
                 self.handles = Some(handles);
