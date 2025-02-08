@@ -382,6 +382,21 @@ impl Runtime {
             rt.push_task(task_context, true);
         }
 
+        // 运行时这里需要大改，不需要这么多的冗余逻辑了。只是该实验已完结并且封存了，也没有继续改进的意义了，
+        // 所以这里只是把改进点总结一下，留个注释以供未来开发参考：
+        // spawn和wake以后可以一视同仁，并且运行时不再需要主动wake了，因为：
+        // spawn反正要么直接Ready，要么Pending后一定会有wake。
+        // wake后的首次poll正常情况下会返回Ready，或者对于“多步”Future（如包含多个await的async block），
+        // Pending后也还会再次wake。
+        // 而对于`spurious failure`的情况（单步Future，wake后的首次poll返回Pending），
+        // Future也会主动再次wake（这时没有再wake就属于Future的bug，运行时不能，也不应为其擦屁股）：
+        // https://docs.rs/tokio/latest/tokio/sync/oneshot/struct.Receiver.html
+        // 运行时在没有wake时主动poll的情况发生，且仅应发生在切换task（Waker改变）的时候，
+        // 并且如果返回Pending，也可以预期Future一定会wake新的Waker（注意这里Future有可能因为线程同步问题而隐藏潜在bug，
+        // 导致Future依然wake了旧的Waker。但运行时同样不应为Future这样的bug擦屁股）。
+        // 即使运行时中途在Waker没变时莫名其妙主动poll了，也不影响Pending后Future还会正常wake，
+        // 这种情况正常其实不应该发生，不应该是运行时的标准行为，但因为可以比较简单地无痛处理（直接Pending啥也不用干），
+        // 因此Future可以兼容这种行为，为运行时“擦屁股”。
         for (event, task_id) in event_recver {
             let mut task_context = {
                 let task_map = &Self::current().task_map;
