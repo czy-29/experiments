@@ -22,7 +22,14 @@ impl WakerHandle {
     }
 
     pub fn update(&self, cx: &mut Context<'_>) {
-        self.0.lock().unwrap().replace(cx.waker().clone());
+        let mut guard = self.0.lock().unwrap();
+        let waker = cx.waker();
+
+        if guard.as_ref().is_some_and(|w| w.will_wake(waker)) {
+            return;
+        }
+
+        guard.replace(waker.clone());
     }
 
     pub fn wake(&self) {
