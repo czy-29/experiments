@@ -255,7 +255,7 @@ impl<T: Send + 'static> Future for Task<T> {
 
         match &self.handles {
             Some(handles) => match handles.output.try_recv() {
-                Err(_) => unreachable!(),
+                Err(_) => Poll::Pending,
                 Ok(output) => {
                     self.done = true;
                     Poll::Ready(output)
@@ -504,7 +504,7 @@ impl Runtime {
         Self::try_current().expect("runtime has not been started")
     }
 
-    pub fn main<T>(spin_on_wake: bool, entry_future: T) -> T::Output
+    pub fn main<T>(entry_future: T) -> T::Output
     where
         T: Future + 'static,
         T::Output: Termination + Send,
@@ -542,21 +542,9 @@ impl Runtime {
                         Self::current().task_map.push_task(task_context);
                     }
                     Event::Wake => {
-                        if spin_on_wake {
-                            let output = loop {
-                                if let Poll::Ready(output) = task_context.poll() {
-                                    break output;
-                                }
-                            };
-
-                            if let Some(output) = task_context.handle_entry(output) {
-                                return output;
-                            }
-                        } else {
-                            let rt = Self::current();
-                            rt.task_map.push_task(task_context);
-                            rt.event_sender.wake(task_id);
-                        }
+                        let rt = Self::current();
+                        rt.task_map.push_task(task_context);
+                        rt.event_sender.wake(task_id);
                     }
                 },
             }
@@ -701,16 +689,16 @@ where
 }
 
 fn main() -> impl Termination {
-    Runtime::main(true, async_main())
+    Runtime::main(async_main())
 }
 
 async fn async_main() -> impl Termination {
     println!("start");
 
-    let dur = Duration::from_secs_f64(3.0);
-    let dur2 = Duration::from_secs_f64(1.5);
-    let t1 = spawn(None, sleep(dur));
-    let t2 = spawn(None, async move { sleep(dur2).await });
+    let dur15 = Duration::from_secs_f64(1.5);
+    let dur30 = Duration::from_secs_f64(3.0);
+    let t1 = spawn(None, sleep(dur15));
+    let t2 = spawn(None, async move { sleep(dur30).await });
     let join = async move {
         t1.await;
         t2.await;
