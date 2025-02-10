@@ -1,4 +1,4 @@
-use experiments::sleep::sleep;
+use experiments::sleep2::sleep;
 use std::thread;
 use tokio::{
     runtime::{Handle, RuntimeFlavor},

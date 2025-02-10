@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use experiments::sleep::*;
+use experiments::{sleep::*, sleep2::sleep as sleep2};
 
 use std::{
     any::Any,
@@ -574,8 +574,8 @@ async fn async_main() -> impl Termination {
 
     let dur15 = Duration::from_secs_f64(1.5);
     let dur30 = Duration::from_secs_f64(3.0);
-    let t1 = spawn(None, sleep(dur15));
-    let t2 = spawn(None, async move { sleep(dur30).await });
+    let t1 = spawn(None, sleep2(dur15));
+    let t2 = spawn(None, async move { sleep2(dur30).await });
     let join = async move {
         t1.await;
         t2.await;
